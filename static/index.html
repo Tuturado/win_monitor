@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winmonitor</title>
+<style>
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+	body {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	background-color: #0f172a;
+	color: #f8fafc;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 20px;
+	}
+	h1 { margin-bottom: 20px; font-size: 1.5rem; color: #38bdf8; text-align: center; }
+
+	.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 15px;
+	width: 100%;
+	max-width: 500px;
+	}
+	.card {
+	background-color: #1e293b;
+	padding: 18px 12px;
+	border-radius: 12px;
+	text-align: center;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+	border-top: 4px solid #38bdf8; /* Cor padrão */
+	transition: all 0.3s ease;
+	}
+	.card h2 { font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; }
+	.value { font-size: 1.8rem; font-weight: bold; color: #f1f5f9; }
+	.unit { font-size: 0.9rem; color: #64748b; }
+	.status-text { font-size: 1.1rem; font-weight: bold; margin-top: 5px; }
+
+	/* Classes de Status Coloridos */
+	.normal { border-top-color: #38bdf8; }
+	.warning { border-top-color: #f59e0b; }
+	.warning .value { color: #fbbf24; }
+	.critical { border-top-color: #ef4444; }
+	.critical .value { color: #f87171; }
+	.standby { border-top-color: #64748b; }
+	.standby .value { color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<h1>Monitor de Recursos</h1>
+
+<div class="grid">
+	<!-- CPU -->
+	<div class="card" id="card-cpu">
+	<h2>Uso de CPU</h2>
+	<div class="value" id="cpu">--</div>
+	</div>
+
+	<!-- RAM -->
+	<div class="card" id="card-ram">
+	<h2>Uso de RAM</h2>
+	<div class="value" id="ram">--</div>
+	</div>
+
+	<!-- DISCO -->
+	<div class="card" id="card-disk">
+	<h2>Uso de Disco (C:)</h2>
+	<div class="value" id="disk">--</div>
+	</div>
+
+	<!-- REDE -->
+	<div class="card" id="card-net">
+	<h2>Rede (Down/Up)</h2>
+	<div class="value" style="font-size: 1.1rem;" id="net-down">--</div>
+	<div class="unit" style="color: #38bdf8;" id="net-up">--</div>
+	</div>
+
+	<!-- GPU USO -->
+	<div class="card" id="card-gpu">
+	<h2>Uso de GPU</h2>
+	<div class="value" id="gpu">--</div>
+	</div>
+
+	<!-- GPU TEMP -->
+	<div class="card" id="card-gpu-temp">
+	<h2>Temp GPU</h2>
+	<div class="value" id="gpu_temp">--</div>
+	</div>
+</div>
+
+<script>
+	function updateCardStatus(cardId, value, warnThreshold, critThreshold) {
+		const card = document.getElementById(cardId);
+		card.classList.remove('normal', 'warning', 'critical');
+
+		if (value >= critThreshold) {
+			card.classList.add('critical');
+		} else if (value >= warnThreshold) {
+			card.classList.add('warning');
+		} else {
+			card.classList.add('normal');
+		}
+	}
+
+	async function updateStats() {
+		try {
+			const response = await fetch('/api/stats');
+			const data = await response.json();
+
+			// Atualiza textos
+			document.getElementById('cpu').innerText = data.cpu + '%';
+			document.getElementById('ram').innerText = data.ram + '%';
+			document.getElementById('disk').innerText = data.disk + '%';
+			document.getElementById('net-down').innerText = '⬇ ' + data.net_download;
+			document.getElementById('net-up').innerText = '⬆ ' + data.net_upload;
+
+			// Atualiza cores dinâmicas (Aviso a 75%, Crítico a 90%)
+			updateCardStatus('card-cpu', data.cpu, 75, 90);
+			updateCardStatus('card-ram', data.ram, 80, 95);
+			updateCardStatus('card-disk', data.disk, 85, 95);
+
+			// Trata GPU e Standby
+			const cardGpuTemp = document.getElementById('card-gpu-temp');
+			if (data.gpu_status === 'Standby') {
+				document.getElementById('gpu').innerText = '0%';
+				document.getElementById('gpu_temp').innerText = 'Standby';
+				cardGpuTemp.className = 'card standby';
+			} else {
+				document.getElementById('gpu').innerText = data.gpu + '%';
+				document.getElementById('gpu_temp').innerText = data.gpu_temp + '°C';
+				updateCardStatus('card-gpu-temp', data.gpu_temp, 75, 85);
+			}
+
+		} catch (err) {
+			console.error("Erro ao carregar dados:", err);
+		}
+	}
+
+	setInterval(updateStats, 1000);
+	updateStats();
+</script>
+</body>
+</html>
