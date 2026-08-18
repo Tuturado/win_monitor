@@ -99,21 +99,19 @@ def resource_collector():
 		elapsed = current_time - last_time
 		last_time = current_time
 
-		# CPU e RAM
+		# CPU, RAM
 		cpu = win_cpu.get_cpu_percent()
 		ram = psutil.virtual_memory().percent
 
-		# Atividade de Disco (Cálculo via variação de tempo de I/O)
+		# Atividade de Disco
 		curr_disk_io = psutil.disk_io_counters()
 		disk_active_percent = 0.0
 
 		if curr_disk_io and last_disk_io:
 			try:
-				# Tenta usar busy_time se existir na versão
 				busy_delta = curr_disk_io.busy_time - last_disk_io.busy_time
 				disk_active_percent = (busy_delta / (elapsed * 1000.0)) * 100.0
 			except AttributeError:
-				# Fallback seguro usando soma de tempo de Leitura + Escrita (em ms)
 				read_delta = curr_disk_io.read_time - last_disk_io.read_time
 				write_delta = curr_disk_io.write_time - last_disk_io.write_time
 				total_time_delta = read_delta + write_delta
@@ -144,8 +142,18 @@ def resource_collector():
 				device_count = pynvml.nvmlDeviceGetCount()
 				for i in range(device_count):
 					handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-					usage = pynvml.nvmlDeviceGetUtilizationRates(handle).gpu
-					temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+
+					# Leitura individual de uso
+					try:
+						usage = float(pynvml.nvmlDeviceGetUtilizationRates(handle).gpu)
+					except Exception:
+						usage = 0.0
+
+					# Leitura individual de temperatura (0 = NVML_TEMPERATURE_GPU)
+					try:
+						temp = float(pynvml.nvmlDeviceGetTemperature(handle, 0))
+					except Exception:
+						temp = 0.0
 
 					if temp > 0 or usage > 0:
 						gpu_usage = usage
@@ -221,7 +229,6 @@ if __name__ == "__main__":
 	print(" 🔍 Ou aponte a câmera do celular para o QR Code abaixo:")
 	print("-" * 50)
 
-	# Gera o QR Code no próprio terminal
 	qr = qrcode.QRCode(border=2)
 	qr.add_data(url)
 	qr.make(fit=True)
